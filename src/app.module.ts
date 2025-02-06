@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmConfig } from './config/typeorm.config';
 import { configValidationSchema } from './config/validation.config';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -11,7 +12,9 @@ import { configValidationSchema } from './config/validation.config';
       validate: (config) => {
         const parsedConfig = configValidationSchema.safeParse(config);
         if (!parsedConfig.success) {
-          throw new Error(parsedConfig.error.errors.map((error) => error.message).join('\n'));
+          throw new Error(
+            parsedConfig.error.errors.map((error) => error.message).join('\n'),
+          );
         }
         return parsedConfig.data;
       },
@@ -19,7 +22,9 @@ import { configValidationSchema } from './config/validation.config';
     TypeOrmModule.forRootAsync({
       useFactory: typeOrmConfig,
       inject: [ConfigService],
-  })],
+    }),
+    ProductsModule,
+  ],
   controllers: [],
   providers: [],
 })
