@@ -11,18 +11,18 @@ export class Product {
   @Column({ type: 'numeric', nullable: false, default: 0 })
   product_price: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text'})
   product_description: string;
 
-  @Column({ type: 'text', nullable: false, unique: true })
+  @Column({ type: 'text',  unique: true})
   product_slug: string;
 
-  @Column({ type: 'numeric', nullable: false, default: 0 })
+  @Column({ type: 'numeric', default: 0 })
   product_stock: number;
 
-  @Column({ type: 'text', array: true })
+  @Column({ type: 'text', array: true})
   product_sizes: string[];
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text'})
   product_gender: string;
 }
