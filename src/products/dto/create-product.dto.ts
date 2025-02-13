@@ -66,4 +66,13 @@ export class CreateProductDto {
     message: 'Each product tag must be at most 100 characters long',
   })
   product_tags: string[];
+
+  @IsOptional()
+  @IsArray({ message: 'Product images must be an array' })
+  @IsString({ each: true, message: 'Each product image must be a string' })
+  @MaxLength(255, {
+    each: true,
+    message: 'Each product image must be at most 255 characters long',
+  })
+  product_images: string[];
 }
