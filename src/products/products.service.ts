@@ -1,13 +1,14 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { validate as isUUID } from 'uuid';
 import { ProductImage, Product } from './entities';
@@ -21,6 +22,7 @@ export class ProductsService {
     private productRepository: Repository<Product>,
     @InjectRepository(ProductImage)
     private productImageRepository: Repository<ProductImage>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -41,12 +43,17 @@ export class ProductsService {
     const products = await this.productRepository.find({
       take: limit,
       skip: offset,
-      //TODO: relations
+      relations: {
+        product_images: true,
+      }
     });
     if (!products) {
       throw new BadRequestException('No products found');
     }
-    return products;
+    return products.map( product => ({
+      ...product,
+      product_images: product.product_images.map(product_image => product_image.product_image_url)
+    }));
   }
 
   async findOne(term: string) {
@@ -64,32 +71,72 @@ export class ProductsService {
             product_slug: term.toLowerCase(),
           },
         )
+        .leftJoinAndSelect('product.product_images', 'product_images')
         .getOne();
     }
     if (!product) {
       throw new BadRequestException('Product not found');
     }
-    return product;
+
+    return product
+  }
+
+  async findOnePlain(term: string){
+    const { product_images = [], ...rest } = await this.findOne(term);
+    return {
+      ...rest,
+      product_images: product_images.map(product_image => product_image.product_image_url)
+    }
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
+
+    const { product_images, ...toUpdate } = updateProductDto;
+
     const product = await this.productRepository.preload({
       product_id: id,
-      ...updateProductDto,
-      product_images: [],
+      ...toUpdate,
     });
+
     if (!product) {
       throw new NotFoundException(
         `Product with ${product.product_id} not found`,
       );
     }
 
+    // query runner
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      await this.productRepository.save(product);
-      return product;
+
+      if (product_images) {
+        await queryRunner.manager.delete(ProductImage, { product: {product_id: id} });
+        product.product_images = product_images.map(product_image => this.productImageRepository.create({product_image_url: product_image}));
+      }
+      await queryRunner.manager.save(product);
+      await queryRunner.commitTransaction();
+      await queryRunner.release();
+      //await this.productRepository.save(product);
+      return this.findOnePlain(id);
     } catch (error) {
+
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
       this.logger.error(error.message);
     }
+  }
+
+  private handleDBExceptions( error: any ) {
+
+    if ( error.code === '23505' )
+      throw new BadRequestException(error.detail);
+    
+    this.logger.error(error)
+    // console.log(error)
+    throw new InternalServerErrorException('Unexpected error, check server logs');
+
   }
 
   async remove(id: string) {
@@ -100,4 +147,20 @@ export class ProductsService {
     await this.productRepository.remove(product);
     return `This action removes a #${id} product`;
   }
+
+  async deleteAllProducts() {
+    const query = this.productRepository.createQueryBuilder('product');
+
+    try {
+      return await query
+        .delete()
+        .where({})
+        .execute();
+
+    } catch (error) {
+      this.handleDBExceptions(error);
+    }
+
+  }
+  
 }

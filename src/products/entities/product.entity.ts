@@ -37,7 +37,7 @@ export class Product {
   @Column({ type: 'text', array: true, default: [] })
   product_tags: string[];
 
-  @OneToMany(() => ProductImage, (productImage) => productImage.product, { cascade: true })
+  @OneToMany(() => ProductImage, (productImage) => productImage.product, { cascade: true, eager: true })
   product_images?: ProductImage[];
 
   @BeforeInsert()
