@@ -1,6 +1,16 @@
 import { z } from 'zod';
 
 export const configValidationSchema = z.object({
+  PORT: z
+    .string({
+      required_error: 'PORT is required',
+      invalid_type_error: 'PORT must be a string',
+    })
+    .regex(/^\d+$/, { message: 'PORT must be a number' })
+    .transform((value) => parseInt(value, 10))
+    .refine((value) => value > 0 && value < 65536, {
+      message: 'PORT must be a valid port number',
+    }),
   POSTGRES_HOST: z
     .string({
       required_error: 'POSTGRES_HOST is required',
